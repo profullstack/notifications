@@ -162,6 +162,41 @@ test('unsubscribe tells the server', async () => {
   assert.equal(await unsubscribe({ env }), false);
 });
 
+test('unsubscribe can POST for apps with a POST /unsubscribe route', async () => {
+  const { env, calls } = browser();
+  await subscribe({ env, vapidPublicKey: generateVapidKeys().publicKey });
+  await unsubscribe({ env, removeUrl: '/api/push/unsubscribe', removeMethod: 'POST' });
+  assert.deepEqual(calls.at(-1).slice(0, 2), ['POST', '/api/push/unsubscribe']);
+  assert.match(calls.at(-1)[2], /fcm\/send\/xyz/);
+});
+
+test('subscribe treats a redirected save (lost session) as a failure', async () => {
+  const { env } = browser();
+  const inner = env.fetch;
+  env.fetch = async (url, init) => {
+    if (url !== '/api/push/subscribe') return inner(url, init);
+    const res = new Response('<html>sign in</html>', { status: 200 });
+    Object.defineProperty(res, 'redirected', { value: true });
+    return res;
+  };
+  await assert.rejects(
+    subscribe({ env, saveUrl: '/api/push/subscribe' }),
+    (e) => e.reason === 'save-failed' && /signed out/.test(e.message)
+  );
+});
+
+test('subscribe gives up after timeoutMs instead of hanging', async () => {
+  const { env, pushManager } = browser();
+  pushManager.subscribe = () => new Promise(() => {});
+  await assert.rejects(
+    subscribe({ env, vapidPublicKey: generateVapidKeys().publicKey, timeoutMs: 20 }),
+    (e) => e.reason === 'timeout'
+  );
+  const quiet = browser();
+  quiet.env.Notification.requestPermission = () => new Promise(() => {});
+  await assert.rejects(subscribe({ env: quiet.env, timeoutMs: 20 }), (e) => e.reason === 'timeout');
+});
+
 test('urlBase64ToUint8Array decodes a VAPID key to 65 bytes', () => {
   assert.equal(urlBase64ToUint8Array(generateVapidKeys().publicKey).length, 65);
 });

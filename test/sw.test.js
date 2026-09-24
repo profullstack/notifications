@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { installPushHandlers, notificationFromPayload } from '../src/sw.js';
+import { buildClassic } from '../scripts/build-sw-classic.js';
+
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('payload JSON becomes a notification; text becomes the body', () => {
   const n = notificationFromPayload(JSON.stringify({ title: 'Live', body: 'Go', url: '/c/x', tag: 't' }), { icon: '/i.png' });
@@ -51,4 +56,16 @@ test('push shows a notification; click focuses or opens the page', async () => {
   open.handlers.notificationclick({ notification: { close() {}, data: { url: '/analyses/1' } }, waitUntil: (p) => (waited = p) });
   await waited;
   assert.equal(focused, true);
+});
+
+test('sw-classic.js is current and works without modules (importScripts)', async () => {
+  assert.equal(read('../src/sw-classic.js'), buildClassic(read('../src/sw.js')), 'run: npm run build');
+  const scope = fakeScope();
+  vm.runInNewContext(read('../src/sw-classic.js'), { self: scope, URL });
+  assert.equal(typeof scope.PushHandlers.installPushHandlers, 'function');
+  scope.PushHandlers.installPushHandlers(scope, { title: 'Classic' });
+  let waited;
+  scope.handlers.push({ data: { text: () => 'hello' }, waitUntil: (p) => (waited = p) });
+  await waited;
+  assert.deepEqual([scope.shown[0].title, scope.shown[0].options.body], ['Classic', 'hello']);
 });

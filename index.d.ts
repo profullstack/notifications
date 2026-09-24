@@ -67,7 +67,8 @@ export type PushUnavailableReason =
   | 'no-server-key'
   | 'save-failed'
   | 'brave-push-off'
-  | 'no-push-service';
+  | 'no-push-service'
+  | 'timeout';
 
 export interface PushSupport {
   supported: boolean;
@@ -93,6 +94,8 @@ export interface SubscribeOptions {
   saveUrl?: string;
   save?: (subscription: PushSubscriptionJSON) => unknown;
   headers?: Record<string, string>;
+  /** Give up on the permission prompt / subscribe after this many ms (PushError 'timeout'). Default 0: wait. */
+  timeoutMs?: number;
   fetch?: typeof fetch;
   env?: unknown;
 }
@@ -101,6 +104,8 @@ export function getSubscription(options?: { scope?: string; env?: unknown }): Pr
 export function unsubscribe(options?: {
   scope?: string;
   removeUrl?: string;
+  /** HTTP method for removeUrl. Default 'DELETE'. */
+  removeMethod?: string;
   headers?: Record<string, string>;
   env?: unknown;
   fetch?: typeof fetch;

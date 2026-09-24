@@ -1,6 +1,6 @@
 {
   "name": "@profullstack/notifications",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "Web Push that works everywhere, once: VAPID + RFC 8291 encryption from node:crypto (zero dependencies), a browser client that fetches the key at runtime and says exactly why push is unavailable, and service-worker handlers.",
   "keywords": [
@@ -38,6 +38,7 @@
       "types": "./index.d.ts",
       "import": "./src/sw.js"
     },
+    "./sw-classic": "./src/sw-classic.js",
     "./package.json": "./package.json"
   },
   "types": "./index.d.ts",
@@ -52,6 +53,8 @@
   },
   "sideEffects": false,
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node scripts/build-sw-classic.js",
+    "prepack": "node scripts/build-sw-classic.js"
   }
 }

@@ -64,6 +64,8 @@ button.onclick = async () => {
 };
 ```
 
+Options worth knowing: `timeoutMs` stops `subscribe()` waiting forever on Chrome's quiet permission prompt or Brave (it throws reason `'timeout'`); a save that was redirected (a lost session sent to the sign-in page) throws `'save-failed'` rather than passing; `unsubscribe({ removeUrl, removeMethod: 'POST' })` suits a POST /unsubscribe route (the default is DELETE).
+
 `subscribe()` replaces a subscription that was made with a different key, so rotating keys doesn't silently stop delivery.
 
 ## Service worker
@@ -71,6 +73,13 @@ button.onclick = async () => {
 ```js
 import { installPushHandlers } from '@profullstack/notifications/sw';
 installPushHandlers(self, { icon: '/icon-192.png' });
+```
+
+A plain-script (non-module) service worker loads the same code with `importScripts`; serve `@profullstack/notifications/sw-classic` (`src/sw-classic.js`) from your app:
+
+```js
+importScripts('/vendor/notifications-sw.js');
+self.PushHandlers.installPushHandlers(self, { icon: '/icon-192.png' });
 ```
 
 It shows `{ title, body, url, icon, tag }` payloads. Clicking a notification focuses a tab already on that URL, or opens one.

@@ -25,6 +25,8 @@ export const REASON_MESSAGES = {
   'no-server-key': 'Push notifications are not set up on this server yet.',
   'brave-push-off':
     'Brave has push messaging switched off. Turn on "Use Google services for push messaging" in brave://settings/privacy, restart Brave, then try again.',
+  timeout:
+    'The browser did not answer the notification request. If a blocked-notification icon is showing in the address bar, click it and allow notifications, then try again.',
   'no-push-service':
     'This browser could not reach its push service, so it cannot receive notifications. Some Chromium builds ship without one; Chrome, Edge, Firefox and Safari work.',
 };
@@ -133,6 +135,18 @@ function sameKey(a, b) {
   return true;
 }
 
+/** Reject with PushError('timeout') if `promise` takes longer than `ms` (0 = wait forever). */
+function withTimeout(promise, ms) {
+  if (!ms) return promise;
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new PushError('timeout')), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function registrationFor({ serviceWorkerUrl, scope, env }) {
   const container = env.navigator.serviceWorker;
   const existing = await container.getRegistration(scope);
@@ -152,6 +166,10 @@ async function registrationFor({ serviceWorkerUrl, scope, env }) {
  *   saveUrl            POST the subscription JSON here (optional)
  *   save               or a function to call with it (optional)
  *   headers            extra headers for saveUrl (e.g. Authorization)
+ *   timeoutMs          give up on the permission prompt and on subscribing
+ *                      after this long (PushError 'timeout'). Chrome's quiet
+ *                      prompt and Brave can otherwise leave it pending forever.
+ *                      Default 0: wait.
  *
  * Resolves to the subscription JSON. Throws PushError with a `reason`.
  */
@@ -162,7 +180,9 @@ export async function subscribe(options = {}) {
   if (!support.supported) throw new PushError(support.reason);
 
   const permission =
-    env.Notification.permission === 'granted' ? 'granted' : await env.Notification.requestPermission();
+    env.Notification.permission === 'granted'
+      ? 'granted'
+      : await withTimeout(Promise.resolve(env.Notification.requestPermission()), options.timeoutMs);
   if (permission !== 'granted') throw new PushError('denied');
 
   const publicKey =
@@ -183,7 +203,10 @@ export async function subscribe(options = {}) {
     subscription = null;
   }
   try {
-    subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+    subscription ??= await withTimeout(
+      registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }),
+      options.timeoutMs
+    );
   } catch (error) {
     throw subscribeError(error, env);
   }
@@ -197,7 +220,16 @@ export async function subscribe(options = {}) {
       body: JSON.stringify(json),
       credentials: 'include',
     });
-    if (!res.ok) throw new PushError('save-failed', `Could not save the subscription (${res.status})`);
+    // A lost session is often answered with a redirect to the sign-in page,
+    // which fetch follows to a 200: that is not a saved subscription.
+    if (!res.ok || res.redirected) {
+      throw new PushError(
+        'save-failed',
+        res.redirected
+          ? 'Could not save the subscription: you may have been signed out. Sign in and try again.'
+          : `Could not save the subscription (${res.status})`
+      );
+    }
   }
   return json;
 }
@@ -212,11 +244,19 @@ export async function getSubscription({ scope, env = globalThis } = {}) {
 }
 
 /**
- * Unsubscribe this browser. `removeUrl` (optional) receives DELETE with the
- * endpoint so the server can forget it. Resolves true when something was
- * unsubscribed.
+ * Unsubscribe this browser. `removeUrl` (optional) receives { endpoint } as
+ * JSON so the server can forget it, sent with `removeMethod` (default DELETE;
+ * pass 'POST' for a POST /unsubscribe route). Resolves true when something
+ * was unsubscribed.
  */
-export async function unsubscribe({ scope, removeUrl, headers, env = globalThis, fetch: doFetch } = {}) {
+export async function unsubscribe({
+  scope,
+  removeUrl,
+  removeMethod = 'DELETE',
+  headers,
+  env = globalThis,
+  fetch: doFetch,
+} = {}) {
   const registration = await env.navigator?.serviceWorker?.getRegistration(scope);
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return false;
@@ -224,7 +264,7 @@ export async function unsubscribe({ scope, removeUrl, headers, env = globalThis,
   await subscription.unsubscribe();
   if (removeUrl) {
     await (doFetch ?? env.fetch.bind(env))(removeUrl, {
-      method: 'DELETE',
+      method: removeMethod,
       headers: { 'content-type': 'application/json', ...(headers ?? {}) },
       body: JSON.stringify({ endpoint }),
       credentials: 'include',
