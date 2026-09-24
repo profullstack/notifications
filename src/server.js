@@ -37,15 +37,15 @@ export function generateVapidKeys() {
 
 /**
  * VAPID keys from the environment, read at RUN time. Accepts the usual names
- * (VAPID_PUBLIC_KEY / NEXT_PUBLIC_VAPID_PUBLIC_KEY / PUBLIC_VAPID_KEY and
- * VAPID_PRIVATE_KEY), so the same keys work whatever an app called them.
+ * (VAPID_PUBLIC_KEY / NEXT_PUBLIC_VAPID_PUBLIC_KEY / PUBLIC_VAPID_KEY /
+ * VAPID_PUBLIC and VAPID_PRIVATE_KEY / PRIVATE_VAPID_KEY / VAPID_PRIVATE), so the same keys work whatever an app called them.
  * Returns null when either half is missing.
  */
 export function vapidKeysFromEnv(env = process.env) {
   const get = (name) => (typeof env[name] === 'string' && env[name].trim() ? env[name].trim() : null);
   const publicKey =
-    get('VAPID_PUBLIC_KEY') ?? get('NEXT_PUBLIC_VAPID_PUBLIC_KEY') ?? get('PUBLIC_VAPID_KEY');
-  const privateKey = get('VAPID_PRIVATE_KEY') ?? get('PRIVATE_VAPID_KEY');
+    get('VAPID_PUBLIC_KEY') ?? get('NEXT_PUBLIC_VAPID_PUBLIC_KEY') ?? get('PUBLIC_VAPID_KEY') ?? get('VAPID_PUBLIC');
+  const privateKey = get('VAPID_PRIVATE_KEY') ?? get('PRIVATE_VAPID_KEY') ?? get('VAPID_PRIVATE');
   if (!publicKey || !privateKey) return null;
   return { publicKey, privateKey };
 }

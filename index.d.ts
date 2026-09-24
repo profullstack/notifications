@@ -26,6 +26,7 @@ export interface SendOptions {
   keys: VapidKeys;
   /** RFC 8292 contact: mailto:you@example.com or an https: URL. */
   subject: string;
+  /** Seconds the push service keeps an undelivered message. Default 86400 (24h); the web-push package used 4 weeks. */
   ttl?: number;
   urgency?: 'very-low' | 'low' | 'normal' | 'high';
   topic?: string;

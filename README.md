@@ -25,7 +25,7 @@ import {
   sendPushToMany,
 } from '@profullstack/notifications/server';
 
-const keys = vapidKeysFromEnv(); // VAPID_PUBLIC_KEY (or NEXT_PUBLIC_VAPID_PUBLIC_KEY) + VAPID_PRIVATE_KEY, read at run time
+const keys = vapidKeysFromEnv(); // VAPID_PUBLIC_KEY (or NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PUBLIC) + VAPID_PRIVATE_KEY (or VAPID_PRIVATE), read at run time
 
 // GET /api/push/vapid-public-key
 export const GET = () => vapidPublicKeyResponse(keys);
@@ -41,6 +41,8 @@ await sendPushToMany(userSubscriptions, { title: 'You are live', body: 'Tap to o
   onGone: (endpoint) => db.deleteSubscription(endpoint), // 404/410 from the push service
 });
 ```
+
+Messages the push service can't deliver yet are kept for `ttl` seconds, 24 hours by default. The `web-push` package defaulted to 4 weeks, so pass `ttl: 28 * 24 * 3600` when migrating if late delivery matters.
 
 New keys: `node -e "import('@profullstack/notifications/server').then(m => console.log(m.generateVapidKeys()))"`.
 

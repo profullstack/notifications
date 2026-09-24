@@ -90,6 +90,7 @@ test('keys: generate, read from env at runtime, serve the public half', async ()
   assert.equal(Buffer.from(keys.privateKey, 'base64url').length, 32);
   assert.deepEqual(vapidKeysFromEnv({ NEXT_PUBLIC_VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey }), keys);
   assert.equal(vapidKeysFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey }), null);
+  assert.deepEqual(vapidKeysFromEnv({ VAPID_PUBLIC: keys.publicKey, VAPID_PRIVATE: keys.privateKey }), keys);
   const res = vapidPublicKeyResponse(keys);
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { publicKey: keys.publicKey });
