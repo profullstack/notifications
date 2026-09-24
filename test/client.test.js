@@ -134,6 +134,26 @@ test('subscribe throws PushError with the reason', async () => {
   );
 });
 
+test("subscribe names Chromium's AbortError instead of echoing it", async () => {
+  const failing = (message, brave = false) => {
+    const { env, pushManager } = browser();
+    if (brave) env.navigator.brave = {};
+    pushManager.subscribe = async () => {
+      throw new DOMException(message, 'AbortError');
+    };
+    return subscribe({ env, vapidPublicKey: generateVapidKeys().publicKey });
+  };
+  // ungoogled Chromium: no push service at all
+  await assert.rejects(failing('Registration failed - push service error'), (e) => e.reason === 'no-push-service');
+  // Brave with "Use Google services for push messaging" off
+  await assert.rejects(
+    failing('Registration failed - push service error', true),
+    (e) => e.reason === 'brave-push-off' && /brave:\/\/settings\/privacy/.test(e.message)
+  );
+  // Chromium's refused permission is also an AbortError
+  await assert.rejects(failing('Registration failed - permission denied'), (e) => e.reason === 'denied');
+});
+
 test('unsubscribe tells the server', async () => {
   const { env, calls } = browser();
   await subscribe({ env, vapidPublicKey: generateVapidKeys().publicKey });

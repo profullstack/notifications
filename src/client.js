@@ -23,7 +23,27 @@ export const REASON_MESSAGES = {
   'no-notification': 'This browser does not support notifications.',
   denied: 'Notifications are blocked for this site. Allow them in your browser’s site settings, then try again.',
   'no-server-key': 'Push notifications are not set up on this server yet.',
+  'brave-push-off':
+    'Brave has push messaging switched off. Turn on "Use Google services for push messaging" in brave://settings/privacy, restart Brave, then try again.',
+  'no-push-service':
+    'This browser could not reach its push service, so it cannot receive notifications. Some Chromium builds ship without one; Chrome, Edge, Firefox and Safari work.',
 };
+
+/**
+ * Chromium rejects pushManager.subscribe() with AbortError for two unrelated
+ * causes, told apart only by the message: "Registration failed - permission
+ * denied", and "Registration failed - push service error" when the browser
+ * cannot reach its own push service (Brave's default, ungoogled Chromium).
+ * The raw text reads like the app failed, so name the cause instead.
+ */
+function subscribeError(error, env) {
+  if (!error || error instanceof PushError) return error;
+  if (error.name === 'NotAllowedError' || permissionOf(env) === 'denied' || /permission/i.test(error.message ?? '')) {
+    return new PushError('denied');
+  }
+  if (error.name === 'AbortError') return new PushError(env.navigator?.brave ? 'brave-push-off' : 'no-push-service');
+  return error;
+}
 
 function isIOS(nav) {
   const ua = nav?.userAgent ?? '';
@@ -162,7 +182,11 @@ export async function subscribe(options = {}) {
     await subscription.unsubscribe();
     subscription = null;
   }
-  subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+  try {
+    subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+  } catch (error) {
+    throw subscribeError(error, env);
+  }
 
   const json = typeof subscription.toJSON === 'function' ? subscription.toJSON() : subscription;
   if (options.save) await options.save(json);
