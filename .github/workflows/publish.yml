@@ -1,0 +1,103 @@
+# Publish the release to npm.
+#
+# The release is the trigger, so there is no separate step to forget: a channel
+# that only updates when somebody remembers is a channel that silently serves an
+# old version forever. `workflow_dispatch` is for re-running one that failed on
+# something transient, and is safe because a version already on the registry is
+# skipped rather than attempted.
+#
+# Authenticates with an npm automation token in the repository secret
+# `NPM_TOKEN`. `registry-url` is what makes setup-node write the token into
+# .npmrc; it is required for token auth and fatal under trusted publishing.
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # No install step: this package has no dependencies.
+      - run: node --test
+        env:
+          CI: true
+
+      - name: Read the version being published
+        id: version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "@profullstack/notifications@$VERSION"
+
+      - name: Check the tag matches package.json
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::release tag $TAG does not match package.json version $VERSION"
+            exit 1
+          fi
+
+      - name: Skip if this version is already on npm
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if npm view "@profullstack/notifications@$VERSION" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "@profullstack/notifications@$VERSION is already published — nothing to do"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require an npm token
+        if: steps.published.outputs.already == 'false'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is not set — add an npm automation token as a repository secret named NPM_TOKEN"
+            exit 1
+          fi
+
+      - name: Publish
+        if: steps.published.outputs.already == 'false'
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # A brand-new scoped package 404s on every read path for minutes after a
+      # successful publish, so a short window here fails a release that worked.
+      # Wait longer, and never fail the run on the read alone: `npm publish`
+      # exiting 0 is the authority on whether it published.
+      - name: Confirm the registry has it
+        if: steps.published.outputs.already == 'false'
+        continue-on-error: true
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for _ in $(seq 1 30); do
+            if [ "$(npm view "@profullstack/notifications@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+              echo "@profullstack/notifications@$VERSION is on the registry"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::published, but the registry does not report @profullstack/notifications@$VERSION yet (first publishes can lag several minutes)"

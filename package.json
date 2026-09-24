@@ -1,0 +1,57 @@
+{
+  "name": "@profullstack/notifications",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Web Push that works everywhere, once: VAPID + RFC 8291 encryption from node:crypto (zero dependencies), a browser client that fetches the key at runtime and says exactly why push is unavailable, and service-worker handlers.",
+  "keywords": [
+    "web-push",
+    "push-notifications",
+    "vapid",
+    "service-worker",
+    "pwa",
+    "notifications",
+    "rfc8291",
+    "rfc8292",
+    "nextjs",
+    "zero-dependencies"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/profullstack/notifications.git"
+  },
+  "homepage": "https://github.com/profullstack/notifications#readme",
+  "bugs": {
+    "url": "https://github.com/profullstack/notifications/issues"
+  },
+  "license": "MIT",
+  "author": "Profullstack, LLC",
+  "exports": {
+    "./server": {
+      "types": "./index.d.ts",
+      "import": "./src/server.js"
+    },
+    "./client": {
+      "types": "./index.d.ts",
+      "import": "./src/client.js"
+    },
+    "./sw": {
+      "types": "./index.d.ts",
+      "import": "./src/sw.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./index.d.ts",
+  "files": [
+    "src",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --test"
+  }
+}
