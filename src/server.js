@@ -173,7 +173,7 @@ export function buildPushRequest(keys, subscription, payload, { subject, ttl = 2
 
 /**
  * Send one notification to one subscription.
- * Resolves to { endpoint, status, sent, gone }; never throws for a delivery
+ * Resolves to { endpoint, status, sent, gone, error }; never throws for a delivery
  * failure. `gone` means the push service says the subscription no longer
  * exists (404/410): delete it from your store.
  */
@@ -186,7 +186,12 @@ export async function sendPush(subscription, payload, { keys, subject, ttl, urge
     result.status = response.status;
     result.sent = response.ok;
     result.gone = response.status === 404 || response.status === 410;
-    if (!response.ok && !result.gone) result.error = `push service answered ${response.status}`;
+    if (!response.ok && !result.gone) {
+      // The push service's own words (FCM, Mozilla and Apple all explain a
+      // rejected VAPID header or payload in the body), trimmed for logs.
+      const detail = (await response.text().catch(() => '')).trim().slice(0, 300);
+      result.error = `push service answered ${response.status}${detail ? `: ${detail}` : ''}`;
+    }
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
   }

@@ -18,6 +18,7 @@ export interface PushResult {
   sent: boolean;
   /** The push service says the subscription no longer exists: delete it. */
   gone: boolean;
+  /** Why it was not sent, including the push service's response text when it gave one. */
   error: string | null;
 }
 

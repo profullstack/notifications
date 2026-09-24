@@ -125,6 +125,14 @@ test('sendPush reports sent, gone and errors without throwing', async () => {
     { endpoint: subscription.endpoint, status: 201, sent: true, gone: false, error: null }
   );
   const gone = await sendPush(subscription, 'hi', { keys, subject: 'mailto:a@b.c', fetch: reply(410) });
+  const rejected = await sendPush(subscription, 'hi', {
+    keys,
+    subject: 'mailto:a@b.c',
+    fetch: async () => new Response('invalid JWT provided', { status: 403 }),
+  });
+  assert.equal(rejected.error, 'push service answered 403: invalid JWT provided');
+  const bare = await sendPush(subscription, 'hi', { keys, subject: 'mailto:a@b.c', fetch: reply(500) });
+  assert.equal(bare.error, 'push service answered 500');
   assert.equal(gone.gone, true);
   const broken = await sendPush(subscription, 'hi', { keys, subject: 'mailto:a@b.c', fetch: async () => { throw new Error('offline'); } });
   assert.equal(broken.sent, false);
