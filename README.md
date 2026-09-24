@@ -9,7 +9,8 @@ Web Push that works the first time, in every app.
   - iPhone or iPad without the site added to the Home Screen;
   - notifications blocked in the browser's settings;
   - no service worker support;
-  - the server has no key configured.
+  - the server has no key configured;
+  - the browser cannot reach its own push service (Chromium's "Registration failed - push service error"), with the exact setting to change on Brave.
 
 ```sh
 npm install @profullstack/notifications

@@ -65,7 +65,9 @@ export type PushUnavailableReason =
   | 'no-notification'
   | 'denied'
   | 'no-server-key'
-  | 'save-failed';
+  | 'save-failed'
+  | 'brave-push-off'
+  | 'no-push-service';
 
 export interface PushSupport {
   supported: boolean;
